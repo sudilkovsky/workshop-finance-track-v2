@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+*.sqlite
+!/finance.sqlite
+*.sqlite-*
+.DS_Store

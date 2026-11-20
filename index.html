@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="uk">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Транзакції · Finance</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f6f8;color:#20262d;font:15px system-ui,sans-serif}main{max-width:1080px;margin:56px auto;padding:0 24px}header{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px}h1{font-size:30px;margin:5px 0}p{color:#6b7280;margin:8px 0}.eyebrow{font-size:12px;letter-spacing:2px;color:#63756a}button,input,select{font:inherit}button{cursor:pointer;border:1px solid #d9dee3;border-radius:8px;background:white;padding:10px 14px;color:inherit}button.primary{background:#246449;border-color:#246449;color:white}button:disabled{opacity:.5;cursor:wait}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #94cdb0;outline-offset:2px}.panel{background:white;border:1px solid #e0e4e8;border-radius:12px;overflow:hidden}.bar{padding:20px;display:flex;justify-content:space-between;gap:16px;align-items:center}.bar input{max-width:320px;width:100%}input,select{border:1px solid #d7dce1;border-radius:7px;padding:11px;background:white;min-width:0}table{width:100%;border-collapse:collapse;text-align:left;white-space:nowrap}th{background:#f9fafb;font-size:12px;color:#6b7280;font-weight:500}th,td{padding:16px 20px;border-top:1px solid #edf0f2}td.description{white-space:normal;min-width:180px}td.actions{text-align:right}td.actions button{padding:6px 9px;font-size:13px}.delete{color:#a13e3e}.scroll{overflow:auto}#status{color:#a13e3e;min-height:24px}dialog{border:1px solid #ddd;border-radius:14px;padding:28px;width:440px;max-width:calc(100% - 32px)}dialog::backdrop{background:#17251c66}h2{margin:0 0 24px;font-size:22px}form{display:grid;gap:17px}label{display:grid;gap:7px;font-size:14px}.buttons{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}.empty{text-align:center;color:#6b7280;padding:40px}#formError{margin:0;color:#a13e3e}footer{font-size:12px;color:#889099;margin-top:18px}@media(max-width:600px){main{margin-top:28px;padding:0 16px}header{align-items:flex-start;gap:12px}h1{font-size:26px}.bar{flex-wrap:wrap}th,td{padding:14px}}
+#budgetForm{display:flex;flex-wrap:wrap;align-items:end;padding:20px;margin-bottom:16px}
+#budgetAmount{width:155px}#budgetFeedback{flex-basis:100%;margin:0}
+.budget-value{display:flex;flex-wrap:wrap;align-items:end;gap:12px}
+#spent{font-weight:600;padding-block:11px}
+.actions button svg{display:block;width:17px;height:17px}
+#budgetGroupChoices{display:flex;flex-wrap:wrap;gap:6px}
+#budgetGroupChoices:empty{display:none}
+#budgetGroupChoices button{padding:5px 9px;font-size:13px}
+#budgetGroupChoices button[aria-pressed="true"]{background:#e1f2e9;border-color:#21634d;color:#174b3b}
+</style>
+<main>
+<header><div><div class="eyebrow">FINANCE / БАЗА ДАНИХ</div><h1>Транзакції</h1><p>Знай, куди йде кожна гривня.</p></div><button class="primary" id="add">+ Додати транзакцію</button></header>
+<form class="panel" id="budgetForm">
+<div class="budget-value"><label>Загальний бюджет, грн<input id="budgetAmount" type="number" min="0" step="0.01" value="10000" required></label><output id="spent" aria-live="polite">Витрачено —</output></div>
+<button id="saveBudget" disabled>Зберегти бюджет</button>
+<p id="budgetFeedback" role="status" hidden></p><p id="budgetWarning" role="status" hidden></p>
+</form>
+<div id="status" role="status" aria-live="polite"></div>
+<section class="panel"><div class="bar"><input id="search" type="search" placeholder="Пошук за описом або оплатою…" aria-label="Пошук транзакцій"><span id="count"></span></div><div class="scroll"><table><thead><tr><th>Дата</th><th>Сума</th><th>Опис</th><th>Категорія</th><th>Група бюджету</th><th>Спосіб витрати</th><th>Тип</th><th aria-label="Дії"></th></tr></thead><tbody id="rows"></tbody></table></div></section>
+<footer>Локальна база · finance.sqlite</footer>
+</main>
+<dialog id="editor"><h2 id="heading">Нова транзакція</h2><form id="form"><label>Тип транзакції<select name="transaction_type"><option value="expense">Витрата</option><option value="income">Дохід</option><option value="refund">Повернення коштів</option></select></label><label>Дата<input name="spent_on" type="date" required></label><label>Сума<input name="amount" type="number" min="0.01" step="any" required placeholder="0.00"></label><label>Опис<input name="description" required maxlength="2000" placeholder="Опис транзакції" list="descriptionSuggestions" autocomplete="off"></label><datalist id="descriptionSuggestions"></datalist><label>Категорія<select name="category_id" required><option value="">Оберіть категорію</option></select></label><label>Група бюджету<select name="budget_group"><option value="">Без групи</option><option>Fixed</option><option>Investments</option><option>Savings</option><option>Rich life</option></select></label><div id="budgetGroupChoices" role="group" aria-label="Швидкий вибір групи бюджету"></div><label>Спосіб оплати<input name="payment_method" required maxlength="200" list="methods" placeholder="Наприклад, картка"><datalist id="methods"><option value="Картка"><option value="Готівка"><option value="Переказ"></datalist></label><p id="formError" role="alert"></p><div class="buttons"><button type="button" id="cancel">Скасувати</button><button class="primary" id="save">Зберегти</button></div></form></dialog>
+<script>
+const $=id=>document.getElementById(id);let records=[],categories=[],editing=null;
+const money=new Intl.NumberFormat('uk-UA',{maximumFractionDigits:2,minimumFractionDigits:2});
+const percentage=new Intl.NumberFormat('uk-UA',{style:'percent',maximumFractionDigits:1});
+let budgetAmount=null;
+let spentAmount=null;
+const editIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 16-1 5 5-1L20 8l-4-4L4 16zm10-10 4 4"/></svg>';
+const deleteIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg>';
+const types={expense:'Витрата',income:'Дохід',refund:'Повернення коштів'};
+async function request(path,method='GET',data){const response=await fetch(path,{method,headers:{'Content-Type':'application/json'},body:data?JSON.stringify(data):undefined});const result=await response.json();if(!response.ok)throw Error(result.error||'Помилка запиту.');return result}
+const api=(path='',method='GET',data)=>request('/api/expenses'+path,method,data);
+async function loadBudget(){
+    try {
+        const budget=await request('/api/budget');
+        budgetAmount=budget.amount;
+        $('budgetAmount').value=budgetAmount;
+        renderSpent();
+        $('saveBudget').disabled=false;
+    } catch(e) {
+        $('budgetFeedback').hidden=false;
+        $('budgetFeedback').textContent=e.message;
+    }
+}
+$('budgetForm').onsubmit=async event=>{
+    event.preventDefault();
+    $('saveBudget').disabled=true;
+    $('budgetFeedback').hidden=false;
+    try {
+        const budget=await request('/api/budget','PUT',{amount:$('budgetAmount').valueAsNumber});
+        budgetAmount=budget.amount;
+        renderSpent();
+        $('budgetFeedback').textContent='Бюджет збережено.';
+    } catch(e) {
+        $('budgetFeedback').textContent=e.message;
+    } finally {
+        $('saveBudget').disabled=false;
+    }
+};
+function renderSpent(){
+    const amount=$('budgetAmount').valueAsNumber;
+    const display=budgetAmount!==null && amount>0 && spentAmount!==null
+        ? percentage.format(spentAmount/amount)
+        : '—';
+    $('spent').textContent='Витрачено '+display;
+
+    const today = new Date();
+    const month = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-`;
+    let monthlySpent = 0;
+    let monthlyRichLife = 0;
+    for (const record of records) {
+        if (record.transaction_type !== 'expense' || !record.spent_on.startsWith(month)) continue;
+        if (record.category_name === 'Здоров’я' || record.category_name === 'Житло та комунальні') continue;
+        const expense = Number(record.amount);
+        monthlySpent += expense;
+        if (record.budget_group === 'Rich life') monthlyRichLife += expense;
+    }
+
+    const exceedsBudgetShare = budgetAmount !== null && monthlySpent > budgetAmount * 0.8;
+    const exceedsRichLifeLimit = monthlyRichLife > 3000;
+    const reasons = [];
+    if (exceedsBudgetShare) {
+        reasons.push(`Витрати за місяць — ${money.format(monthlySpent)} грн, понад 80% бюджету (${money.format(budgetAmount * 0.8)} грн).`);
+    }
+    if (exceedsRichLifeLimit) {
+        reasons.push(`Витрати в Rich life за місяць — ${money.format(monthlyRichLife)} грн, понад ліміт ${money.format(3000)} грн.`);
+    }
+
+    const warning = $('budgetWarning');
+    warning.hidden = !(exceedsBudgetShare || exceedsRichLifeLimit);
+    warning.textContent = warning.hidden ? '' : `ти поганий хлопчик. ${reasons.join(' ')}`;
+}
+$('budgetAmount').oninput=renderSpent;
+function updateSpent(){
+    spentAmount=records.reduce((total,record)=>{
+        if(record.transaction_type==='expense') return total+Number(record.amount);
+        if(record.transaction_type==='refund') return total-Number(record.amount);
+        return total;
+    },0);
+    renderSpent();
+}
+function render(){const query=$('search').value.toLocaleLowerCase();const visible=records.filter(r=>[types[r.transaction_type],r.description,r.payment_method,r.spent_on,r.category_name??'Без категорії'].some(v=>String(v).toLocaleLowerCase().includes(query)));$('count').textContent=`Записів: ${visible.length}`;$('rows').replaceChildren();for(const r of visible){const tr=document.createElement('tr');for(const [value,cls] of [[r.spent_on,''],[money.format(r.amount),''],[r.description,'description'],[r.category_name??'Без категорії',''],[r.budget_group??'—',''],[r.payment_method,''],[types[r.transaction_type],'']]){const td=document.createElement('td');td.textContent=value;td.className=cls;tr.append(td)}const actions=document.createElement('td');actions.className='actions';const edit=document.createElement('button');edit.innerHTML=editIcon;edit.title='Редагувати';edit.setAttribute('aria-label',edit.title);edit.onclick=()=>openEditor(r);const del=document.createElement('button');del.innerHTML=deleteIcon;del.title='Видалити';del.setAttribute('aria-label',del.title);del.className='delete';del.style.marginLeft='8px';del.onclick=async()=>{if(!confirm(`Видалити транзакцію «${r.description}»?`))return;del.disabled=true;try{await api('/'+r.id,'DELETE');await load()}catch(e){$('status').textContent=e.message;del.disabled=false}};actions.append(edit,del);tr.append(actions);$('rows').append(tr)}if(!visible.length){const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=8;td.className='empty';td.textContent=records.length?'Нічого не знайдено.':'Транзакцій поки немає. Додайте перший запис.';tr.append(td);$('rows').append(tr)}}
+async function load(){try{const [expenses,response]=await Promise.all([api(),fetch('/api/categories')]);if(!response.ok)throw Error('Не вдалося завантажити категорії.');categories=await response.json();records=expenses;updateSpent();$('status').textContent='';render()}catch(e){$('status').textContent='Не вдалося завантажити записи. '+e.message}}
+function updateCategoryRequirement(){
+    const {transaction_type,category_id}=$('form').elements;
+    category_id.required=transaction_type.value==='expense';
+    category_id.options[0].text=category_id.required?'Оберіть категорію':'Без категорії';
+}
+const budgetGroupsByCategory = {
+    'Продукти': ['Fixed', 'Rich life'],
+    'Кафе та ресторани': ['Rich life', 'Fixed'],
+    'Транспорт': ['Fixed', 'Savings', 'Rich life'],
+    'Житло та комунальні': ['Fixed', 'Savings', 'Rich life'],
+    'Здоров’я': ['Fixed', 'Savings', 'Rich life'],
+    'Покупки': ['Rich life', 'Fixed', 'Savings'],
+    'Розваги': ['Rich life', 'Savings'],
+    'Освіта': ['Rich life', 'Fixed', 'Savings'],
+    'Інше': ['', 'Fixed', 'Investments', 'Savings', 'Rich life'],
+};
+let previousAutomaticGroup = '';
+
+function updateBudgetGroup(applyDefault) {
+    const {transaction_type, category_id, budget_group} = $('form').elements;
+    const category = categories.find(item => String(item.id) === category_id.value);
+    const groups = transaction_type.value === 'expense'
+        ? budgetGroupsByCategory[category?.name] ?? []
+        : [];
+    const defaultGroup = groups[0] ?? '';
+
+    if (applyDefault) {
+        if (defaultGroup || budget_group.value === previousAutomaticGroup) {
+            budget_group.value = defaultGroup;
+        }
+        previousAutomaticGroup = defaultGroup;
+    }
+
+    const choices = $('budgetGroupChoices');
+    choices.replaceChildren();
+    for (const group of groups.filter(Boolean)) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = group;
+        button.setAttribute('aria-pressed', String(group === budget_group.value));
+        button.onclick = () => {
+            budget_group.value = group;
+            budget_group.focus();
+            updateBudgetGroup(false);
+        };
+        choices.append(button);
+    }
+}
+
+function updateDescriptionSuggestions() {
+    const suggestions = $('descriptionSuggestions');
+    const query = $('form').elements.description.value.trim().toLocaleLowerCase('uk');
+    suggestions.replaceChildren();
+    if (editing !== null || [...query].length < 2) return;
+
+    const seen = new Set();
+    for (const {description} of records) {
+        const normalized = description.toLocaleLowerCase('uk');
+        if (!normalized.startsWith(query) || seen.has(normalized)) continue;
+        seen.add(normalized);
+        suggestions.append(new Option(description));
+    }
+}
+
+$('form').elements.description.oninput = updateDescriptionSuggestions;
+$('form').elements.category_id.onchange = () => updateBudgetGroup(true);
+$('form').elements.budget_group.onchange = () => updateBudgetGroup(false);
+$('form').elements.transaction_type.onchange = () => {
+    updateCategoryRequirement();
+    updateBudgetGroup(true);
+};
+function openEditor(record){editing=record?.id??null;previousAutomaticGroup='';$('form').reset();$('formError').textContent='';$('heading').textContent=record?'Редагувати транзакцію':'Нова транзакція';const select=$('form').elements.category_id;select.replaceChildren(new Option('Оберіть категорію',''));for(const c of categories){if(c.is_active||c.id===record?.category_id)select.add(new Option(c.name+(c.is_active?'':' (архівна)'),c.id))}const today=new Date();const date=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;for(const name of ['spent_on','amount','description','payment_method','category_id','budget_group'])$('form').elements[name].value=record?.[name]??(name==='spent_on'?date:'');$('form').elements.transaction_type.value=record?.transaction_type??'expense';updateCategoryRequirement();updateDescriptionSuggestions();updateBudgetGroup(false);$('editor').showModal()}
+$('add').onclick=()=>openEditor();$('cancel').onclick=()=>$('editor').close();$('search').oninput=render;$('form').onsubmit=async event=>{event.preventDefault();$('save').disabled=true;$('formError').textContent='';try{await api(editing===null?'':'/'+editing,editing===null?'POST':'PUT',Object.fromEntries(new FormData($('form'))));$('editor').close();await load()}catch(e){$('formError').textContent=e.message}finally{$('save').disabled=false}};load();loadBudget();
+</script>
+</html>
